@@ -11,7 +11,7 @@ I use the Windows 10 Subsystem for Linux just for ease of use. So these instruct
 2. Install Pip: `sudo apt-get -y install python-pip python-dev libffi-dev libssl-dev`
 3. Upgrade Pip: `sudo pip install --upgrade pip`
 4. Install Ansible: `pip install ansible --user`
-..* _`--user` installs packages local to the user account instead of globally to avoid permissions issues with Pip and the Linux Subsystem_
+    * _`--user` installs packages local to the user account instead of globally to avoid permissions issues with Pip and the Linux Subsystem_
 5. Since the `ansible*` commands are installed under `~/.local/bin`, we need to add that to the $PATH, so run the command: `echo 'PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc`
 6. Either exit out of the bash prompt and start it again from the Windows menu, or run `source .bashrc` to update your $PATH to include Ansible.
 
