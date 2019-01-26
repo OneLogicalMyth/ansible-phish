@@ -1,0 +1,15 @@
+[Unit]
+Description=GoPhish
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/gophish
+ExecStart=/opt/gophish/gophish
+SuccessExitStatus=143
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

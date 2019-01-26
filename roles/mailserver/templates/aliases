@@ -1,0 +1,2 @@
+# See man 5 aliases for format
+{{ email_address_prefix }}@{{ domain_name }}: {{ email_address_prefix }}

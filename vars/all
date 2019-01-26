@@ -1,0 +1,63 @@
+# Generic params
+# ssh_access is the private key for ansible to use
+# ensure the public key for the below private key is included in the below var so_ssh_keys
+ssh_access: ~/.ssh/id_rsa
+
+# Digital Ocean Variables
+# Image ID 42326229 is Apache LAMP on Ubuntu 18
+# Size 1gb is $5 pcm
+# paste the public keys you want adding to the box after creation as per the example below
+#  64 char DO api key below
+do_api_token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+do_ssh_keys:
+  key1:
+    key_name: "Ansible Server"
+    pub_key: "ssh-rsa AAAA..."
+  key2:
+    key_name: "Work Laptop"
+    pub_key: "ssh-rsa BBBB..."
+  key3:
+    key_name: "Work Desktop"
+    pub_key: "ssh-rsa CCCC..."
+do_region: "lon1"
+do_image_id: 42326229
+do_size: s-1vcpu-1gb
+
+# this is important as it affects your SMTP configuration
+# the prefix below and domain name are joined together at creation
+droplet_hostname_prefix: mail
+
+# Domain name and email
+# Email address prefix is the word to use before the @example.com, this is the mailbox user and user account on the droplet
+domain_name: example.com
+email_address_prefix: phish
+
+# mail server setup
+# Password hash below is Password1$
+# You can generate your own using the Linux command 'mkpasswd --method=sha-512'
+user_password: "$6$/wcdVLQ6pg3psd$6GS5tJ/M2hDSa7RHd5TN2n4q00dl7O8D5vI8SkWj6rOQ9O38MmP9BLcq44tOdEwZ5DM4R6Xpwy7yKGWNyc2IO0"
+user_password_clear: "Password1$"
+# relay IP a can also be a cidr network in the format of 127.0.0.0/8
+relay_ip:
+
+# rainloop webmail configuration
+# rainloop will always have the virtual host of the droplet prefix, for example mail.domain.com
+# rainloop is always servered over https using the letsencrypt certificate configured earlier
+# rainloop password must be hashed to work the below hash is Password1$
+# To generate a new hash, change the password in rainloop and copy out the hash it saves in the ini file
+rl_admin_username: admin
+rl_admin_password: 3d2fc2ca7e9f4cb6fe4955ff31ab9ea9
+rl_web_port: 4545
+
+# firewall setup
+# admin_ips are subnets/IP for your remote management, for example SSH, gophish admin and rainloop web mail etc.
+admin_ips:
+- 1.1.1.1
+- 8.8.8.8
+- 192.168.1.0/24
+
+# GoPhish
+# gophish_path is a single word a-z lowercase only that you want Apache2 to reverse proxy to GoPhish
+# For example if you use the word 'phish' the url would be https://example.com/phish?id=12345 that GoPhish would
+gophish_path: phish
+gophish_password: NotDefaultPasswordAnymore

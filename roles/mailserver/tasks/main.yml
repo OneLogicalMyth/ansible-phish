@@ -1,0 +1,195 @@
+- name: Disabling IPv6 on the droplet
+  copy:
+    src: files/sysctl.conf
+    dest: "/etc/sysctl.conf"
+    owner: root
+    group: root
+    mode: 0644
+- name: Running 'sysctl -p'
+  command: "sysctl -p"
+
+- name: Create a login for mailbox user
+  user:
+    name: "{{ email_address_prefix }}"
+    password: "{{ user_password }}"
+    state: present
+
+- name: Installing packages requried for mail server
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - dovecot-imapd
+    - dovecot-lmtpd
+    - postfix
+    - postgrey
+    - postfix-policyd-spf-python
+    - opendkim
+    - opendkim-tools
+    - opendmarc
+    - mailutils
+    - procmail
+
+- name: Adding postfix configuration main.cf
+  template:
+    src: main.cf
+    dest: /etc/postfix/main.cf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Adding postfix configuration master.cf
+  copy:
+    src: files/master.cf
+    dest: /etc/postfix/master.cf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Adding mail name for postfix
+  lineinfile:
+    path: /etc/mailname
+    line: "{{ droplet_hostname_prefix }}.{{ domain_name }}"
+    create: yes
+    owner: root
+    group: root
+
+- name: Create DKIM directory
+  file:
+    path: "/etc/opendkim/keys/{{ domain_name }}"
+    state: directory
+    owner: opendkim
+    group: opendkim
+    mode: 0755
+    recurse: yes
+
+- name: Adding opendkim configuration opendkim.conf
+  template:
+    src: opendkim.conf
+    dest: /etc/opendkim.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Adding opendkim configuration TrustedHosts
+  template:
+    src: TrustedHosts
+    dest: /etc/opendkim/TrustedHosts
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Generating DKIM keys
+  command: "opendkim-genkey -s mail -d {{ domain_name }} -D /etc/opendkim/keys/{{ domain_name }}/"
+
+- name: Adding opendkim configuration default/opendkim
+  lineinfile:
+    path: /etc/default/opendkim
+    line: 'SOCKET="inet:12301"'
+    create: yes
+    owner: root
+    group: root
+
+- name: Set permissions on DKIM directory recursively
+  file:
+    path: "/etc/opendkim"
+    state: directory
+    owner: opendkim
+    group: opendkim
+    mode: 0755
+    recurse: yes
+
+- name: Locking down the DKIM private key
+  file:
+    path: "/etc/opendkim/keys/{{ domain_name }}/mail.private"
+    state: file
+    mode: 0600
+
+- name: Configure opendmarc
+  template:
+    src: opendmarc.conf
+    dest: /etc/opendmarc.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Create opendmarc directory
+  file:
+    path: "/etc/opendmarc"
+    state: directory
+    owner: opendmarc
+    group: opendmarc
+    mode: 0755
+
+- name: Adding opendmarc configuration ignore.hosts
+  copy:
+    content: "localhost"
+    dest: /etc/opendmarc/ignore.hosts
+    owner: opendmarc
+    group: opendmarc
+    mode: 0644
+
+- name: Adding opendmarc configuration default/opendmarc
+  lineinfile:
+    path: /etc/default/opendmarc
+    line: 'SOCKET="inet:54321"'
+    create: yes
+    owner: root
+    group: root
+
+- name: Apply permissions to opendmarc directory recursively
+  file:
+    path: "/etc/opendmarc"
+    state: directory
+    owner: opendmarc
+    group: opendmarc
+    mode: 0755
+    recurse: yes
+
+- name: Configure dovecot.conf file
+  template:
+    src: dovecot.conf
+    dest: /etc/dovecot/dovecot.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Add aliases
+  template:
+    src: aliases
+    dest: /etc/aliases
+    owner: root
+    group: root
+    mode: 0644
+
+- name: "Grabbing the DKIM key for {{ domain_name }}"
+  shell: 'cut -d ''"'' -f 2 "/etc/opendkim/keys/{{ domain_name }}/mail.txt" | tr -d "[:space:]"'
+  register: dkim_key
+  args:
+    warn: False
+
+- name: "Adding DMARC1 record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "TXT", "name": "mail._domainkey", "data": "{{ dkim_key.stdout }}", "priority": "", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201
+
+- name: Restarting mail server services
+  service:
+    name: "{{ item }}"
+    state: restarted
+  with_items:
+    - postfix
+    - opendkim
+    - opendmarc
+    - dovecot
+
+- name: "Allowing TCP 25 for SMTP"
+  ufw:
+    rule: allow
+    port: 25
+    proto: tcp

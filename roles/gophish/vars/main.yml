@@ -1,0 +1,7 @@
+enable_ufw_firewall: true
+
+install_packages:
+  - postfix
+  - unzip
+  - python-bcrypt
+

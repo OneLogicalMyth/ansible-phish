@@ -1,0 +1,55 @@
+- digital_ocean_domain:
+    state: present
+    name: "{{ domain_name }}"
+    ip: "{{ droplet_ip }}"
+    api_token: "{{ do_api_token }}"
+
+- name: "Adding WWW record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "A", "name": "www", "data": "{{ droplet_ip }}", "priority": "", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201
+
+- name: "Adding {{ droplet_hostname_prefix }} record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "A", "name": "{{ droplet_hostname_prefix }}", "data": "{{ droplet_ip }}", "priority": "", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201
+
+- name: "Adding MX record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "MX", "name": "@", "data": "{{ droplet_hostname_prefix }}.{{ domain_name }}.", "priority": "10", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201
+
+- name: "Adding SPF record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "TXT", "name": "@", "data": "v=spf1 mx a -all", "priority": "", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201
+
+- name: "Adding DMARC1 record for {{ domain_name }}"
+  uri:
+    url: "https://api.digitalocean.com/v2/domains/{{ domain_name }}/records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ do_api_token }}"
+    body: { "type": "TXT", "name": "._dmarc", "data": "v=DMARC1; p=reject", "priority": "", "port": "", "ttl": "300", "weight": "", "flags": "", "tag": "" }
+    body_format: json
+    status_code: 201

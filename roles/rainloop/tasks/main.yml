@@ -1,0 +1,113 @@
+- name: Installing package unzip, php-xml and php-curl
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - php-xml
+    - php-curl
+    - unzip
+
+- name: Download latest RainLoop .zip file.
+  get_url:
+    validate_certs: True
+    url: https://www.rainloop.net/repository/webmail/rainloop-community-latest.zip
+    dest: "/root/rainloop.zip"
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Create web directory for RainLoop
+  file:
+    path: "/var/www/rainloop"
+    state: directory
+    mode: 0755
+    owner: www-data
+    group: www-data
+
+- name: Unzip RainLoop file
+  unarchive:
+    src: "/root/rainloop.zip"
+    dest: "/var/www/rainloop"
+    remote_src: True  # File is on target server and not locally.
+    owner: www-data
+    group: www-data
+
+- name: Change ownership of RainLoop folder and files
+  file:
+    path: "/var/www/rainloop"
+    owner: www-data
+    group: www-data
+    recurse: True
+
+- name: Add listen port for RainLoop to Apache ports.conf
+  lineinfile:
+    path: /etc/apache2/ports.conf
+    line: " Listen {{ rl_web_port }}"
+    insertafter: "<IfModule ssl_module>"
+
+- name: Configure Apache site for RainLoop
+  template:
+    src: rainloop.conf
+    dest: /etc/apache2/sites-available/rainloop.conf
+    owner: www-data
+    group: www-data
+    mode: 0644
+
+- name: Enable Apache module headers
+  apache2_module:
+    state: present
+    name: headers
+
+- name: Enabled Apache RainLoop site
+  command: a2ensite rainloop
+
+- name: Restarting Apache2
+  service:
+    name: apache2
+    state: restarted
+
+- name: "Allowing TCP {{ rl_web_port }} for RainLoop access for admin IPs"
+  ufw:
+    rule: allow
+    port: "{{ rl_web_port }}"
+    proto: tcp
+    src: "{{ item }}"
+  with_items: "{{ admin_ips }}"
+
+- name: "Running RainLoop inital web setup"
+  uri:
+    url: "https://{{ droplet_hostname_prefix }}.{{ domain_name }}:{{ rl_web_port }}/"
+    method: GET
+    status_code: 200
+
+- name: Configure RainLoop application.ini
+  template:
+    src: application.ini
+    dest: /var/www/rainloop/data/_data_/_default_/configs/application.ini
+    owner: www-data
+    group: www-data
+    mode: 0644
+
+- name: Disable other domains in RainLoop - data
+  lineinfile:
+    path: /var/www/rainloop/data/_data_/_default_/domains/disabled
+    line: "outlook.com,qq.com,yahoo.com,gmail.com"
+    create: yes
+    owner: www-data
+    group: www-data
+
+- name: Disable other domains in RainLoop - app
+  lineinfile:
+    path: /var/www/rainloop/rainloop/v/1.12.1/app/domains/disabled
+    line: "outlook.com,qq.com,yahoo.com,gmail.com"
+    create: yes
+    owner: www-data
+    group: www-data
+
+- name: "Create {{ domain_name }}.ini file for RainLoop"
+  copy:
+    src: files/domain.ini
+    dest: "/var/www/rainloop/data/_data_/_default_/domains/{{ domain_name }}.ini"
+    owner: www-data
+    group: www-data
+    mode: 0644

@@ -1,0 +1,123 @@
+- name: Allow TCP 22 for SSH.
+  ufw:
+    rule: allow
+    port: 22
+    proto: tcp
+
+- name: Allow TCP 80 for Gophish.
+  ufw:
+    rule: allow
+    port: 80
+    proto: tcp
+
+- name: Allow TCP 443 for Gophish.
+  ufw:
+    rule: allow
+    port: 443
+    proto: tcp
+
+- name: Allow TCP 3333 for Gophish admin access
+  ufw:
+    from: "{{ item }}"
+    rule: allow
+    port: 3333
+    proto: tcp
+  with_items: "{{ admin_ips }}"
+
+- name: Enable ufw.
+  ufw:
+    state: enabled
+    policy: deny
+  when: enable_ufw_firewall
+
+- name: Update APT package cache.
+  apt:
+    update_cache: yes
+
+- name: Upgrade APT to the latest packages.
+  apt:
+    upgrade: safe
+
+- name: Install specified packages.
+  apt:
+    pkg: "{{ install_packages }}"
+    state: latest
+
+- name: Download latest Gophish .zip file.
+  get_url:
+    validate_certs: True
+    url: https://getgophish.com/releases/latest/linux/64
+    dest: "/root/gophish.zip"
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Create directory for gophish.
+  file:
+    path: "/opt/gophish"
+    state: directory
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Unzip gophish file.
+  unarchive:
+    src: "/root/gophish.zip"
+    dest: "/opt/gophish"
+    remote_src: True  # File is on target server and not locally.
+    owner: root
+    group: root
+
+- name: Change ownership of Gophish folder and files.
+  file:
+    path: /opt/gophish
+    owner: root
+    group: root
+    recurse: True
+
+- name: Configure GoPhish config.json
+  template:
+    src: config.json
+    dest: "/opt/gophish/config.json"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy gophish.service file.
+  copy:
+    src: files/gophish.service
+    dest: "/lib/systemd/system/gophish.service"
+    owner: "root"
+    group: "root"
+    mode: 0644
+
+- name: Ensure gophish is started and enabled at boot.
+  service:
+    name: gophish
+    state: started
+    enabled: yes
+
+- name: Running GoPhish inital web setup
+  uri:
+    url: "https://{{ domain_name }}:3333/"
+    method: GET
+    status_code: 200
+
+- name: Updating GoPhish password and grabbing API key
+  script: "files/get_api_key.py --db '/opt/gophish/gophish.db' --newpass '{{ gophish_password }}'"
+  args:
+    executable: python
+  register: result
+
+- set_fact:
+    gophish_api_key: "{{ (result.stdout | from_json).api_key }}"
+
+- name: "Adding sending profile to GoPhish"
+  uri:
+    url: "https://{{ domain_name }}:3333/api/smtp/?api_key={{ gophish_api_key }}"
+    method: POST
+    validate_certs: no
+    body: { "id": 1, "name": "{{ domain_name }}", "interface_type": "SMTP", "host": "localhost:25", "username": "{{ email_address_prefix }}@{{ domain_name }}", "password": "{{ user_password_clear }}", "from_address": "{{ email_address_prefix }} <{{ email_address_prefix }}@{{ domain_name }}>", "modified_date": "{{ ansible_date_time.iso8601_micro }}", "ignore_cert_errors": true }
+    body_format: json
+    status_code: 201, 409
+

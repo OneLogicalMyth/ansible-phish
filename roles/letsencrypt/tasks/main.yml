@@ -1,0 +1,73 @@
+- name: Checking if a letsencrypt certificate exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/privkey.pem"
+  register: cert_file
+
+- apt_repository:
+    repo: "ppa:certbot/certbot"
+  when: cert_file.stat.exists == false
+
+- name: Updating the droplet and installing python-certbot-apache
+  apt:
+    upgrade: safe
+    update_cache: yes
+  when: cert_file.stat.exists == false
+
+- package:
+    name: python-certbot-apache
+    state: present
+  when: cert_file.stat.exists == false
+
+- name: Add apache config to allow bot to work
+  template:
+    src: letsencrypt_verify.txt
+    dest: /etc/apache2/sites-available/000-default.conf
+    owner: www-data
+    group: www-data
+    mode: 0664
+
+- name: Restart apache to allow new config
+  service:
+    name: apache2
+    state: restarted
+  when: cert_file.stat.exists == false
+
+- name: Grabbing a new certificate from letsencrypt
+  raw: "certbot --noninteractive --agree-tos --apache --email {{ email_address_prefix }}@{{ domain_name }} -d {{ domain_name }},www.{{ domain_name }},{{ droplet_hostname_prefix }}.{{ domain_name }}"
+  when: cert_file.stat.exists == false
+
+- name: Enable Apache module headers
+  apache2_module:
+    state: present
+    name: headers
+  
+- name: Enable Apache module remoteip
+  apache2_module:
+    state: present
+    name: remoteip
+
+- name: Enable Apache module proxy
+  apache2_module:
+    state: present
+    name: proxy
+
+- name: Enable Apache module proxy_http
+  apache2_module:
+    state: present
+    name: proxy_http
+
+- name: Replace 000-default.conf
+  template:
+    src: 000-default.conf
+    dest: /etc/apache2/sites-available/000-default.conf
+    owner: www-data
+    group: www-data
+    mode: 0644
+
+- name: Disable letsencrypt Apache SSL site
+  command: a2dissite 000-default-le-ssl
+
+- name: Restarting Apache2
+  service:
+    name: apache2
+    state: restarted
