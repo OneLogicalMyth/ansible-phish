@@ -27,3 +27,4 @@ Ensure that your domain you wish to use for the phish server has been purchased 
 2. Edit the `vars/all` file
 2. Start the deployment with `ansible-playbook DO_Phish.yml`
 
+**NOTE: *Should the playbook fail, ensure you delete the domain name from digital ocean manually, there is currently no check to stop duplicate DNS records***
